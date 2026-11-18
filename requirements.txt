@@ -1,0 +1,9 @@
+faster-whisper>=1.2
+sounddevice>=0.5
+numpy
+pynput>=1.8
+pystray>=0.19
+Pillow>=10
+pyperclip>=1.9
+# NVIDIA cuBLAS for GPU Whisper (the only NVIDIA library it loads; without an NVIDIA GPU, Whisper uses the CPU)
+nvidia-cublas-cu12

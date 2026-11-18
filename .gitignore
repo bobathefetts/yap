@@ -1,0 +1,13 @@
+__pycache__/
+build/
+dist/
+release/
+_test/
+*.part
+*.log
+*.zip
+# models, engine and GPU libraries (about 4.5 GB); the build copies them into the app
+models/
+engine/
+cuda/
+downloads/

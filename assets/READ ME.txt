@@ -1,0 +1,44 @@
+YAP - free, private voice dictation for Windows
+================================================
+
+Hold Ctrl + Windows key, talk, let go. What you said is typed wherever your cursor is,
+cleaned up: no "um"s or "uh"s, self-corrections fixed ("Tuesday, no wait, Wednesday"
+becomes "Wednesday"), punctuation added, spoken lists turned into bullet points.
+
+Everything runs on your own PC. Nothing you say is sent to the internet, and no account is needed.
+
+
+INSTALLING
+1. If you got Yap-Setup-Offline.zip, extract it first (right-click > Extract All)
+   and run Yap-Setup.exe from the extracted folder, so it can find the models next to it.
+   If you got just Yap-Setup.exe, run it.
+2. If Windows says "Windows protected your PC", click "More info", then "Run anyway"
+   (the installer is not code-signed).
+3. Click through the installer. It doesn't need admin rights.
+   Leave "Start Yap when I sign in" ticked so it is always ready.
+4. Yap starts by itself. With just Yap-Setup.exe, the first start downloads the AI
+   models (about 2 GB, or 3.5 GB with an NVIDIA graphics card) with a progress window.
+5. Wait for the small "Yap is ready" message at the bottom of the screen.
+6. Click into any text box, hold Ctrl + Windows, speak, and let go.
+
+Yap is in the Start menu, and its icon (a microphone) sits near the clock; it may be
+behind the ^ arrow. Right-click the icon for settings.
+
+To remove it: Windows Settings > Apps > Installed apps > Yap > Uninstall.
+
+
+TIPS
+- Wrong microphone? Tray icon > Microphone.
+- Say "new paragraph" or "new line" for line breaks.
+- Pressing another key while holding Ctrl + Windows cancels the recording.
+- Text went to the wrong window? Tray icon > Copy last dictation.
+- Settings, history and logs are in C:\Users\<you>\.yap (tray icon > Edit settings / Open log).
+
+
+WHAT YOUR PC NEEDS
+- Windows 10 or 11, 64-bit, about 5 GB of free disk space.
+- Best with an NVIDIA graphics card (about 3 GB of video memory).
+  Without one it still works: speech-to-text runs on the processor with a smaller model,
+  which is slower and a little less accurate.
+- Allow microphone access for desktop apps:
+  Windows Settings > Privacy & security > Microphone.
