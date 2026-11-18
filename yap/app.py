@@ -381,8 +381,15 @@ class App:
             self.root.after(0, self.root.destroy)
 
 
+def _log_thread_crash(args: threading.ExceptHookArgs) -> None:
+    # A windowed app has no console, so without this a crashing thread dies silently.
+    log.error("Thread %s crashed", getattr(args.thread, "name", "?"),
+              exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
+
+
 def main() -> None:
     _setup_logging()
+    threading.excepthook = _log_thread_crash
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(2)
     except Exception:

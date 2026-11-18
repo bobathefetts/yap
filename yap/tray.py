@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 
 import pyperclip
 import pystray
@@ -36,6 +37,10 @@ class Tray:
         self.app = app
         self.state = "loading"
         self.icons = {k: make_icon(k) for k in COLORS}
+        self.icon = self._new_icon()
+
+    def _new_icon(self) -> pystray.Icon:
+        app = self.app
         hk = "+".join(p.strip().capitalize() for p in app.cfg["hotkey"].split("+"))
         cfg = app.cfg
         Item, Menu = pystray.MenuItem, pystray.Menu
@@ -60,12 +65,12 @@ class Tray:
             Item("Restart Yap", lambda: app.restart()),
             Item("Quit Yap", lambda: app.quit()),
         )
-        self.icon = pystray.Icon("Yap", self.icons["loading"], "Yap: starting", menu)
+        return pystray.Icon("Yap", self.icons[self.state], f"Yap: {app.status}"[:120], menu)
 
     def _mic_items(self):
         from .recorder import list_input_devices
         cfg, Item = self.app.cfg, pystray.MenuItem
-        names = list_input_devices(refresh=not self.app.recorder.recording)
+        names = list_input_devices(refresh=True)
         yield Item("Windows default", lambda: self.app.set_microphone(None), radio=True,
                    checked=lambda i: not cfg.get("input_device"))
         for name in names:
@@ -90,7 +95,28 @@ class Tray:
             self.app.flash("Start Yap from the Start menu or File Explorer to make this stick", 5)
 
     def start(self) -> None:
-        threading.Thread(target=self.icon.run, name="tray", daemon=True).start()
+        threading.Thread(target=self._keep_running, name="tray-watch", daemon=True).start()
+
+    def _keep_running(self) -> None:
+        # The tray icon is Yap's only window: if it ever fails, log why and bring it back.
+        # Each attempt gets its own thread, so a failed icon's windows close with it.
+        for attempt in range(1, 6):
+            failed = []
+
+            def run(icon=self.icon, attempt=attempt):
+                try:
+                    icon.run()
+                except Exception:
+                    failed.append(True)
+                    log.exception("Tray icon failed (attempt %d); recreating it", attempt)
+
+            t = threading.Thread(target=run, name="tray", daemon=True)
+            t.start()
+            t.join()
+            if not failed:
+                return  # stopped on purpose (Quit / Restart)
+            time.sleep(1)
+            self.icon = self._new_icon()
 
     def set_state(self, overlay_state: str) -> None:
         state = {"recording": "recording", "processing": "processing"}.get(overlay_state, "idle")

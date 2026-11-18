@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 
 import numpy as np
 import sounddevice as sd
@@ -10,6 +11,14 @@ import sounddevice as sd
 log = logging.getLogger("yap")
 
 TARGET_RATE = 16000
+REFRESH_EVERY = 10.0  # seconds between rescans for newly plugged-in microphones
+
+# PortAudio is not thread-safe, and rescanning devices restarts it, which breaks any other
+# thread using it at that moment. Every PortAudio call goes through this lock.
+_PA_LOCK = threading.RLock()
+_open_streams = 0
+_last_refresh = 0.0
+_last_names: list[str] = []
 
 
 def _mme_index() -> int | None:
@@ -20,20 +29,26 @@ def _mme_index() -> int | None:
 
 
 def list_input_devices(refresh: bool = False) -> list[str]:
-    """Microphone names as Windows shows them (one entry per device)."""
-    if refresh:
-        try:  # pick up mics plugged in since launch
-            sd._terminate()
-            sd._initialize()
-        except Exception:
-            pass
-    mme = _mme_index()
-    names = []
-    for d in sd.query_devices():
-        if d["max_input_channels"] > 0 and d["hostapi"] == mme and "Sound Mapper" not in d["name"]:
-            if d["name"] not in names:
-                names.append(d["name"])
-    return names
+    """Microphone names as Windows shows them (one entry per device). Never raises: on error
+    it returns the last list it found."""
+    global _last_refresh, _last_names
+    with _PA_LOCK:
+        try:
+            # Pick up mics plugged in since launch, unless a recording is using PortAudio.
+            if refresh and _open_streams == 0 and time.monotonic() - _last_refresh > REFRESH_EVERY:
+                _last_refresh = time.monotonic()
+                sd._terminate()
+                sd._initialize()
+            mme = _mme_index()
+            names = []
+            for d in sd.query_devices():
+                if d["max_input_channels"] > 0 and d["hostapi"] == mme and "Sound Mapper" not in d["name"]:
+                    if d["name"] not in names:
+                        names.append(d["name"])
+            _last_names = names
+        except Exception as exc:
+            log.warning("Could not list microphones: %s", exc)
+        return list(_last_names)
 
 
 def resolve_device(setting):
@@ -71,7 +86,8 @@ class Recorder:
         self.level = min(1.0, rms * 12)
 
     def start(self) -> None:
-        with self._lock:
+        global _open_streams
+        with self._lock, _PA_LOCK:
             if self._stream is not None:
                 return
             self._chunks = []
@@ -88,17 +104,27 @@ class Recorder:
                 log.info("16 kHz not supported (%s); recording at %d Hz", exc, self._rate)
                 self._stream = sd.InputStream(samplerate=self._rate, channels=1, dtype="float32",
                                               device=self.device, blocksize=0, callback=self._callback)
-            self._stream.start()
+            _open_streams += 1
+            try:
+                self._stream.start()
+            except Exception:
+                _open_streams -= 1
+                self._stream.close()
+                self._stream = None
+                raise
 
     def stop(self) -> np.ndarray:
+        global _open_streams
         with self._lock:
             stream, self._stream = self._stream, None
         if stream is not None:
-            try:
-                stream.stop()
-                stream.close()
-            except Exception as exc:
-                log.warning("Error closing mic stream: %s", exc)
+            with _PA_LOCK:
+                try:
+                    stream.stop()
+                    stream.close()
+                except Exception as exc:
+                    log.warning("Error closing mic stream: %s", exc)
+                _open_streams -= 1
         self.level = 0.0
         if not self._chunks:
             self.peak = 0.0
